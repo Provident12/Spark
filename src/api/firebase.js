@@ -1,20 +1,16 @@
 // Firebase configuration and initialization
-// Firebase configuration and initialization
-// Free (Spark) plan: Auth + Firestore only
-// Blaze plan: add getStorage import + export when upgrading
-
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDTZi-J_yMLaKCAFdmMvtQz3_L5Yv2xQEg",
-  authDomain: "spark-ef09d.firebaseapp.com",
-  projectId: "spark-ef09d",
-  storageBucket: "spark-ef09d.firebasestorage.app",
-  messagingSenderId: "863725378731",
-  appId: "1:863725378731:web:c2d53008751a631ebdabee"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);
