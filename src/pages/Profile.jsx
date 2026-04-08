@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/lib/AuthContext';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/api/firebase.js';
 import { createPageUrl } from '../utils';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -17,26 +20,24 @@ const skillColors = [
 
 export default function Profile() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      setUser(u);
-      if (u) {
-        base44.entities.StudentProfile.filter({ created_by: u.email }).then(profiles => {
-          if (profiles.length > 0) {
-            setProfile(profiles[0]);
-          } else {
-            navigate(createPageUrl('ProfileBuilder'));
-          }
-        });
-      }
-    });
-  }, []);
+    if (user) {
+      base44.entities.StudentProfile.filter({ created_by: user.email }).then(profiles => {
+        if (profiles.length > 0) {
+          setProfile(profiles[0]);
+        } else {
+          navigate(createPageUrl('ProfileBuilder'));
+        }
+      });
+    }
+  }, [user]);
 
   const handleLogout = async () => {
-    await base44.auth.logout();
+    await signOut(auth);
+    window.location.href = '/';
   };
 
   if (!profile) return (

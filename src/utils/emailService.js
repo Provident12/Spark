@@ -29,17 +29,17 @@ function formatDate(dateStr) {
 async function send({ to, subject, body }) {
   const email = { to, from: FROM_EMAIL, subject, body, sentAt: new Date().toISOString() };
 
-  if (IS_MOCK && !RESEND_ENABLED) {
-    // Dev only: log to console
+  if (!RESEND_ENABLED || IS_MOCK) {
+    // No email backend available — log to console (free Firebase plan or mock mode)
     console.log(
       `%c📧 EMAIL → ${to}%c\n${subject}\n\n${body}`,
       'color:#e53e3e;font-weight:bold', 'color:inherit',
     );
-    sentEmails.push(email);
+    sentEmails.push({ ...email, status: 'logged' });
     return email;
   }
 
-  // Call server-side Resend endpoint
+  // Call server-side email endpoint (Cloud Function or Vite dev middleware)
   try {
     const res = await fetch('/api/email/send', {
       method: 'POST',
@@ -52,8 +52,10 @@ async function send({ to, subject, body }) {
     }
     sentEmails.push({ ...email, resendId: data.id, status: res.ok ? 'sent' : 'failed' });
   } catch (err) {
-    console.error('Email send error:', err);
-    sentEmails.push({ ...email, status: 'error', error: err.message });
+    // Gracefully handle missing email endpoint (e.g. free Firebase plan)
+    console.warn('Email endpoint not available — email logged to console only:', err.message);
+    console.log(`📧 EMAIL → ${to}\n   Subject: ${subject}`);
+    sentEmails.push({ ...email, status: 'logged', error: err.message });
   }
 
   return email;

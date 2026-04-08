@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Input } from '@/components/ui/input';
@@ -13,17 +14,13 @@ import EmptyState from '@/components/EmptyState';
 export default function Landing() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('all');
   const [ageFilter, setAgeFilter] = useState('all');
   const [paidFilter, setPaidFilter] = useState('all');
-
-  useEffect(() => {
-    base44.auth.me().then(u => setUser(u)).catch(() => {});
-  }, []);
 
   const { data: opportunities = [] } = useQuery({
     queryKey: ['opportunities', 'approved'],

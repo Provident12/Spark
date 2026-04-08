@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/lib/AuthContext';
 import { createPageUrl } from '../utils';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
@@ -16,7 +17,7 @@ import EmptyState from '@/components/EmptyState';
 export default function StudentHome() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -28,17 +29,14 @@ export default function StudentHome() {
   const categories = ['Finance & Banking', 'Technology', 'Healthcare', 'Law & Policy', 'Education & Tutoring', 'Hospitality & Tourism', 'Media & Journalism', 'Arts & Culture', 'Environment & Conservation', 'Social Services & NGO', 'Government & Public Sector', 'Sports & Recreation', 'Marketing & Advertising', 'Architecture & Design', 'Retail & Commerce', 'Logistics & Trade', 'Food & Beverage', 'Animal Welfare', 'Community Service', 'Science & Research', 'Real Estate & Property', 'Startup & Entrepreneurship'];
 
   useEffect(() => {
-    base44.auth.me().then((u) => {
-      setUser(u);
-      if (u) {
-        base44.entities.StudentProfile.filter({ created_by: u.email }).then((profiles) => {
-          if (profiles.length > 0) {
-            setProfile(profiles[0]);
-          }
-        });
-      }
-    });
-  }, []);
+    if (user) {
+      base44.entities.StudentProfile.filter({ created_by: user.email }).then((profiles) => {
+        if (profiles.length > 0) {
+          setProfile(profiles[0]);
+        }
+      });
+    }
+  }, [user]);
 
   const { data: opportunities = [] } = useQuery({
     queryKey: ['opportunities', 'approved'],

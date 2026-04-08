@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/lib/AuthContext';
 import { createPageUrl } from '../utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +26,7 @@ export default function PostOpportunity() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('id');
 
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [organization, setOrganization] = useState(null);
   const [orgLoaded, setOrgLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -53,47 +54,44 @@ export default function PostOpportunity() {
   const [schoolRestrictionEnabled, setSchoolRestrictionEnabled] = useState(false);
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      setUser(u);
-      if (u) {
-        base44.entities.Organization.filter({ created_by: u.email }).then(orgs => {
-          if (orgs.length > 0) {
-            setOrganization(orgs[0]);
+    if (user) {
+      base44.entities.Organization.filter({ created_by: user.email }).then(orgs => {
+        if (orgs.length > 0) {
+          setOrganization(orgs[0]);
 
-            if (editId) {
-              base44.entities.Opportunity.filter({ id: editId }).then(opps => {
-                if (opps.length > 0) {
-                  const opp = opps[0];
-                  setFormData({
-                    title: opp.title || '',
-                    type: opp.type || 'Internship',
-                    category: opp.category || '',
-                    location: opp.location || '',
-                    is_remote: opp.is_remote || false,
-                    duration: opp.duration || '',
-                    deadline: opp.deadline ? new Date(opp.deadline) : null,
-                    description: opp.description || '',
-                    responsibilities: opp.responsibilities || '',
-                    requirements: opp.requirements || '',
-                    about_organization: opp.about_organization || '',
-                    is_paid: opp.is_paid || false,
-                    min_age: opp.min_age || '',
-                    max_age: opp.max_age || '',
-                    application_questions: opp.application_questions || [],
-                    restricted_schools: opp.restricted_schools || []
-                  });
-                  setSchoolRestrictionEnabled((opp.restricted_schools || []).length > 0);
-                  setEditStatus(opp.status);
-                  setAdminFeedback(opp.admin_feedback || '');
-                }
-              });
-            }
+          if (editId) {
+            base44.entities.Opportunity.filter({ id: editId }).then(opps => {
+              if (opps.length > 0) {
+                const opp = opps[0];
+                setFormData({
+                  title: opp.title || '',
+                  type: opp.type || 'Internship',
+                  category: opp.category || '',
+                  location: opp.location || '',
+                  is_remote: opp.is_remote || false,
+                  duration: opp.duration || '',
+                  deadline: opp.deadline ? new Date(opp.deadline) : null,
+                  description: opp.description || '',
+                  responsibilities: opp.responsibilities || '',
+                  requirements: opp.requirements || '',
+                  about_organization: opp.about_organization || '',
+                  is_paid: opp.is_paid || false,
+                  min_age: opp.min_age || '',
+                  max_age: opp.max_age || '',
+                  application_questions: opp.application_questions || [],
+                  restricted_schools: opp.restricted_schools || []
+                });
+                setSchoolRestrictionEnabled((opp.restricted_schools || []).length > 0);
+                setEditStatus(opp.status);
+                setAdminFeedback(opp.admin_feedback || '');
+              }
+            });
           }
-          setOrgLoaded(true);
-        });
-      }
-    });
-  }, [editId]);
+        }
+        setOrgLoaded(true);
+      });
+    }
+  }, [user, editId]);
 
   const handleSaveDraft = async () => {
     if (!organization) return;

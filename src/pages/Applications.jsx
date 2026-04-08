@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Card } from '@/components/ui/card';
@@ -309,11 +310,7 @@ function ApplicationCard({ app, interviewSlots, onWithdraw, onSelectSlot, onUnse
 export default function Applications() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    base44.auth.me().then(u => setUser(u)).catch(() => {});
-  }, []);
+  const { user } = useAuth();
 
   const { data: applications = [] } = useQuery({
     queryKey: ['applications', user?.email],

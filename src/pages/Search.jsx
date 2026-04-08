@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/lib/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,7 @@ export default function Search() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [studentProfile, setStudentProfile] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -25,15 +26,12 @@ export default function Search() {
   const [sortBy, setSortBy] = useState('relevance');
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      setUser(u);
-      if (u) {
-        base44.entities.StudentProfile.filter({ created_by: u.email }).then(profiles => {
-          if (profiles.length > 0) setStudentProfile(profiles[0]);
-        });
-      }
-    }).catch(() => {});
-  }, []);
+    if (user) {
+      base44.entities.StudentProfile.filter({ created_by: user.email }).then(profiles => {
+        if (profiles.length > 0) setStudentProfile(profiles[0]);
+      });
+    }
+  }, [user]);
 
   const { data: opportunities = [] } = useQuery({
     queryKey: ['opportunities', 'approved'],

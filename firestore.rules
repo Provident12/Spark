@@ -1,0 +1,100 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: is the requester signed in?
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper: get the user profile doc
+    function userProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Helper: is the requester an admin?
+    function isAdmin() {
+      return isSignedIn() && userProfile().roleKey == 'admin';
+    }
+
+    // User profiles — users can read/write their own, admins can read all
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Student profiles — owner can CRUD, admins can read/update
+    match /StudentProfile/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.created_by == request.auth.token.email || isAdmin());
+      allow delete: if isSignedIn() && (resource.data.created_by == request.auth.token.email || isAdmin());
+    }
+
+    // Organizations — owner can CRUD, anyone signed in can read, admins can update
+    match /Organization/{docId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.created_by == request.auth.token.email || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Opportunities — public read, org owner can CRUD, admins can update
+    match /Opportunity/{docId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.created_by == request.auth.token.email || isAdmin());
+      allow delete: if isSignedIn() && (resource.data.created_by == request.auth.token.email || isAdmin());
+    }
+
+    // Applications — applicant and opportunity org can read, applicant can create
+    match /Application/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Saved opportunities — owner only
+    match /SavedOpportunity/{docId} {
+      allow read: if isSignedIn() && resource.data.created_by == request.auth.token.email;
+      allow create: if isSignedIn();
+      allow delete: if isSignedIn() && resource.data.created_by == request.auth.token.email;
+    }
+
+    // Notifications — owner can read/update, system can create
+    match /Notification/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Interview slots
+    match /InterviewSlot/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // Messages
+    match /Message/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Reports — admins only
+    match /Report/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}

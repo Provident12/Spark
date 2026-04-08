@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/lib/AuthContext';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/api/firebase.js';
 import { createPageUrl } from '../utils';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,24 +14,22 @@ import { toast } from 'sonner';
 
 export default function Settings() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [organization, setOrganization] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      setUser(u);
-      if (u) {
-        base44.entities.Organization.filter({ created_by: u.email }).then(orgs => {
-          if (orgs.length > 0) setOrganization(orgs[0]);
-        }).catch(() => {});
-      }
-    }).catch(() => {});
-  }, []);
+    if (user) {
+      base44.entities.Organization.filter({ created_by: user.email }).then(orgs => {
+        if (orgs.length > 0) setOrganization(orgs[0]);
+      }).catch(() => {});
+    }
+  }, [user]);
 
   const handleLogout = async () => {
-    await base44.auth.logout();
+    await signOut(auth);
+    window.location.href = '/';
   };
 
   const handleDeleteAccount = async () => {
@@ -71,7 +72,8 @@ export default function Settings() {
       }
 
       toast.success('Your account data has been deleted.');
-      await base44.auth.logout();
+      await signOut(auth);
+      window.location.href = '/';
     } catch {
       toast.error('Failed to delete some data. Please try again.');
       setDeleting(false);

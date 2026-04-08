@@ -1,29 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import Navbar from '@/components/Navbar';
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      setUser(u);
-      // Read the actual roleKey from session (org, student, admin)
-      // u.role only stores 'user' or 'admin', which doesn't distinguish org vs student
+    if (user) {
       try {
         const session = JSON.parse(localStorage.getItem('mock_session'));
-        setUserRole(session?.roleKey || u?.role);
+        setUserRole(session?.roleKey || user?.role);
       } catch {
-        setUserRole(u?.role);
+        setUserRole(user?.role);
       }
-    }).catch(() => {
-      setUser(null);
+    } else {
       setUserRole(null);
-    });
-  }, []);
+    }
+  }, [user]);
 
   // Hide navbar on login/signup pages
   const isAuthPage = ['/login', '/signup'].includes(location.pathname);

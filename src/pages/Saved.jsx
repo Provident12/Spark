@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import OpportunityCard from '../components/OpportunityCard';
@@ -11,11 +12,7 @@ import { Heart } from 'lucide-react';
 export default function Saved() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    base44.auth.me().then(u => setUser(u)).catch(() => {});
-  }, []);
+  const { user } = useAuth();
 
   const { data: savedOpportunities = [] } = useQuery({
     queryKey: ['savedOpportunities', user?.email],

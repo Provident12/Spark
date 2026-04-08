@@ -105,7 +105,11 @@ export default function Navbar({ currentPageName, user, userRole }) {
               <button
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-red-500 hover:bg-gray-100 transition-colors"
                 onClick={() => {
-                  import('@/api/base44Client').then(({ base44 }) => base44.auth.logout());
+                  import('firebase/auth').then(({ signOut }) => {
+                    import('@/api/firebase.js').then(({ auth }) => {
+                      signOut(auth).then(() => { window.location.href = '/'; });
+                    });
+                  });
                 }}
               >
                 Logout

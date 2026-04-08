@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
+import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -186,8 +187,9 @@ const skillColors = [
 
 export default function ProfileBuilder() {
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(authUser);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -204,32 +206,40 @@ export default function ProfileBuilder() {
 
   const ages = Array.from({ length: 7 }, (_, i) => 13 + i);
 
+  const [saving, setSaving] = useState(false);
   const [schoolOpen, setSchoolOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      setUser(u);
-      if (u) {
-        base44.entities.StudentProfile.filter({ created_by: u.email }).then(profiles => {
-          if (profiles.length > 0) {
-            setProfile(profiles[0]);
-            setFormData({
-              full_name: profiles[0].full_name || '',
-              age: profiles[0].age || null,
-              school: profiles[0].school || '',
-              interests: profiles[0].interests || [],
-              skills: profiles[0].skills || [],
-              bio: profiles[0].bio || '',
-              parent_name: profiles[0].parent_name || '',
-              parent_email: profiles[0].parent_email || '',
-            });
-          }
-          setLoading(false);
-        });
-      }
-    });
-  }, [navigate]);
+    if (!authUser) return;
+    setUser(authUser);
+
+    // Pre-fill name from auth if available
+    if (authUser.full_name) {
+      setFormData(prev => ({ ...prev, full_name: prev.full_name || authUser.full_name }));
+    }
+
+    // Try loading existing profile in background (for returning users editing profile)
+    // Don't block the UI — show the form immediately
+    setLoading(false);
+
+    let cancelled = false;
+    base44.entities.StudentProfile.filter({ created_by: authUser.email }).then(profiles => {
+      if (cancelled || profiles.length === 0) return;
+      setProfile(profiles[0]);
+      setFormData({
+        full_name: profiles[0].full_name || '',
+        age: profiles[0].age || null,
+        school: profiles[0].school || '',
+        interests: profiles[0].interests || [],
+        skills: profiles[0].skills || [],
+        bio: profiles[0].bio || '',
+        parent_name: profiles[0].parent_name || '',
+        parent_email: profiles[0].parent_email || '',
+      });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [authUser]);
 
   const calculateCompletion = () => {
     let score = 0;
@@ -251,16 +261,22 @@ export default function ProfileBuilder() {
   };
 
   const handleSave = async () => {
-    const completion = calculateCompletion();
-    const data = { ...formData, profile_completion: completion };
+    setSaving(true);
+    try {
+      const completion = calculateCompletion();
+      const data = { ...formData, profile_completion: completion };
 
-    if (profile) {
-      await base44.entities.StudentProfile.update(profile.id, data);
-    } else {
-      await base44.entities.StudentProfile.create(data);
+      if (profile) {
+        await base44.entities.StudentProfile.update(profile.id, data);
+      } else {
+        await base44.entities.StudentProfile.create(data);
+      }
+
+      navigate(createPageUrl('StudentHome'));
+    } catch (err) {
+      console.error('Failed to save profile:', err);
+      setSaving(false);
     }
-
-    navigate(createPageUrl('StudentHome'));
   };
 
   const toggleInterest = (name) => {
@@ -561,10 +577,10 @@ export default function ProfileBuilder() {
 
           <Button
             onClick={handleNext}
-            disabled={currentStep === 0 && formData.age && formData.age < 18 && (!formData.parent_name.trim() || !formData.parent_email.trim())}
+            disabled={saving || (currentStep === 0 && formData.age && formData.age < 18 && (!formData.parent_name.trim() || !formData.parent_email.trim()))}
             className="w-full h-12 bg-red-500 hover:bg-red-600 text-white rounded-full text-base font-semibold disabled:opacity-50"
           >
-            {currentStep < steps.length - 1 ? 'Continue' : 'Complete Profile'}
+            {saving ? 'Saving...' : currentStep < steps.length - 1 ? 'Continue' : 'Complete Profile'}
           </Button>
         </div>
       </div>

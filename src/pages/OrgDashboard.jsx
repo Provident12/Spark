@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Card } from '@/components/ui/card';
@@ -13,21 +14,18 @@ import EmptyState from '@/components/EmptyState';
 
 export default function OrgDashboard() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [organization, setOrganization] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      setUser(u);
-      if (u) {
-        base44.entities.Organization.filter({ created_by: u.email }).then(orgs => {
-          if (orgs.length > 0) {
-            setOrganization(orgs[0]);
-          }
-        });
-      }
-    });
-  }, []);
+    if (user) {
+      base44.entities.Organization.filter({ created_by: user.email }).then(orgs => {
+        if (orgs.length > 0) {
+          setOrganization(orgs[0]);
+        }
+      });
+    }
+  }, [user]);
 
   const { data: opportunities = [] } = useQuery({
     queryKey: ['opportunities', organization?.id],

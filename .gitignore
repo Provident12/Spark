@@ -29,3 +29,7 @@ mock-data.json
 *.sw?
 
 .env
+
+# Firebase
+.firebase/
+functions/node_modules

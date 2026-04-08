@@ -51,20 +51,19 @@ export default function ReviewOrganization() {
       return;
     }
     setLoading(true);
-    await base44.entities.Organization.update(orgId, {
-      ...organization,
-      verification_status: 'suspended',
-      rejection_reason: rejectionReason,
-      admin_notes: notes,
-      admin_checklist: checklist
-    });
-    // Suspend all active opportunities from this org
     const opps = await base44.entities.Opportunity.filter({ organization_id: orgId });
-    for (const opp of opps) {
-      if (opp.status === 'approved' || opp.status === 'pending') {
-        await base44.entities.Opportunity.update(opp.id, { status: 'suspended' });
-      }
-    }
+    await Promise.all([
+      base44.entities.Organization.update(orgId, {
+        ...organization,
+        verification_status: 'suspended',
+        rejection_reason: rejectionReason,
+        admin_notes: notes,
+        admin_checklist: checklist
+      }),
+      ...opps
+        .filter(opp => opp.status === 'approved' || opp.status === 'pending')
+        .map(opp => base44.entities.Opportunity.update(opp.id, { status: 'suspended' })),
+    ]);
     await base44.entities.Notification.create({
       recipient_email: organization.created_by,
       recipient_type: 'org',
@@ -83,21 +82,23 @@ export default function ReviewOrganization() {
 
   const handleApprove = async () => {
     setLoading(true);
-    await base44.entities.Organization.update(orgId, {
-      ...organization,
-      verification_status: 'approved',
-      admin_notes: notes,
-      admin_checklist: checklist
-    });
-    await base44.entities.Notification.create({
-      recipient_email: organization.created_by,
-      recipient_type: 'org',
-      type: 'org_approved',
-      title: 'Organization Approved',
-      message: `Your organization "${organization.name}" has been approved. You can now post opportunities.`,
-      read: false,
-      created_date: new Date().toISOString()
-    });
+    await Promise.all([
+      base44.entities.Organization.update(orgId, {
+        ...organization,
+        verification_status: 'approved',
+        admin_notes: notes,
+        admin_checklist: checklist
+      }),
+      base44.entities.Notification.create({
+        recipient_email: organization.created_by,
+        recipient_type: 'org',
+        type: 'org_approved',
+        title: 'Organization Approved',
+        message: `Your organization "${organization.name}" has been approved. You can now post opportunities.`,
+        read: false,
+        created_date: new Date().toISOString()
+      }),
+    ]);
     queryClient.invalidateQueries({ queryKey: ['organizations'] });
     setLoading(false);
     toast.success('Organization approved');
@@ -110,22 +111,24 @@ export default function ReviewOrganization() {
       return;
     }
     setLoading(true);
-    await base44.entities.Organization.update(orgId, {
-      ...organization,
-      verification_status: 'rejected',
-      rejection_reason: rejectionReason,
-      admin_notes: notes,
-      admin_checklist: checklist
-    });
-    await base44.entities.Notification.create({
-      recipient_email: organization.created_by,
-      recipient_type: 'org',
-      type: 'org_rejected',
-      title: 'Organization Not Approved',
-      message: `Your organization "${organization.name}" was not approved. Reason: ${rejectionReason}. You can update your details and resubmit.`,
-      read: false,
-      created_date: new Date().toISOString()
-    });
+    await Promise.all([
+      base44.entities.Organization.update(orgId, {
+        ...organization,
+        verification_status: 'rejected',
+        rejection_reason: rejectionReason,
+        admin_notes: notes,
+        admin_checklist: checklist
+      }),
+      base44.entities.Notification.create({
+        recipient_email: organization.created_by,
+        recipient_type: 'org',
+        type: 'org_rejected',
+        title: 'Organization Not Approved',
+        message: `Your organization "${organization.name}" was not approved. Reason: ${rejectionReason}. You can update your details and resubmit.`,
+        read: false,
+        created_date: new Date().toISOString()
+      }),
+    ]);
     queryClient.invalidateQueries({ queryKey: ['organizations'] });
     setLoading(false);
     toast.success('Organization rejected');

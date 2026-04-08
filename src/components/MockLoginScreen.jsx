@@ -1,23 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { registerUser, authenticateUser, createEntityProxy } from '@/api/mock/mockStore';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { base44, backendMode } from '@/api/base44Client';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { GraduationCap, Building2, Mail, Lock, User, ArrowLeft } from 'lucide-react';
 import { requestNotificationPermission } from '../utils/browserNotify';
 
+// Static imports for Firebase — avoids slow dynamic import() at runtime
+let firebaseDb, firebaseAuth, firestoreDoc, firestoreGetDoc, firestoreSetDoc;
+if (backendMode === 'firebase') {
+  const fb = await import('@/api/firebase.js');
+  const fs = await import('firebase/firestore');
+  firebaseDb = fb.db;
+  firebaseAuth = fb.auth;
+  firestoreDoc = fs.doc;
+  firestoreGetDoc = fs.getDoc;
+  firestoreSetDoc = fs.setDoc;
+}
 
 async function getPostLoginRoute(email, roleKey) {
   if (roleKey === 'admin') return '/AdminDashboard';
 
+  const entityProxy = backendMode === 'mock'
+    ? (await import('@/api/mock/mockStore.js')).createEntityProxy
+    : (name) => base44.entities[name];
+
   try {
-    const profiles = await createEntityProxy('StudentProfile').filter({ created_by: email });
+    const profiles = await entityProxy('StudentProfile').filter({ created_by: email });
     if (profiles && profiles.length > 0) return '/StudentHome';
   } catch {}
 
   try {
-    const orgs = await createEntityProxy('Organization').filter({ created_by: email });
+    const orgs = await entityProxy('Organization').filter({ created_by: email });
     if (orgs && orgs.length > 0) return '/OrgDashboard';
   } catch {}
 
@@ -26,6 +41,7 @@ async function getPostLoginRoute(email, roleKey) {
 }
 
 export default function MockLoginScreen({ initialView }) {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get('returnTo');
   const roleParam = searchParams.get('role');
@@ -39,12 +55,10 @@ export default function MockLoginScreen({ initialView }) {
   const [loading, setLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
-  // Sync initialView prop
   useEffect(() => {
     if (initialView) setView(initialView);
   }, [initialView]);
 
-  // Sync role from URL param
   useEffect(() => {
     if (roleParam) setSelectedRole(roleParam);
   }, [roleParam]);
@@ -53,47 +67,114 @@ export default function MockLoginScreen({ initialView }) {
     if (!email.trim() || !password.trim()) return;
     setError('');
     setLoading(true);
+
+    // Signal RedirectIfAuthenticated to wait while we compute the route
+    sessionStorage.setItem('spark_post_auth_route', '__pending__');
+
     try {
-      const user = await authenticateUser(email.trim(), password.trim());
-      requestNotificationPermission();
-      const session = JSON.parse(localStorage.getItem('mock_session'));
-      // Only use returnTo for specific pages (not landing/home)
-      if (returnTo && returnTo !== '/' && returnTo !== encodeURIComponent('/')) {
-        window.location.href = returnTo;
+      let route;
+      if (backendMode === 'mock') {
+        const { authenticateUser } = await import('@/api/mock/mockStore.js');
+        const user = await authenticateUser(email.trim(), password.trim());
+        requestNotificationPermission();
+        const session = JSON.parse(localStorage.getItem('mock_session'));
+        route = (returnTo && returnTo !== '/' && returnTo !== encodeURIComponent('/'))
+          ? returnTo
+          : await getPostLoginRoute(user.email, session?.roleKey);
       } else {
-        const route = await getPostLoginRoute(user.email, session?.roleKey);
-        window.location.href = route;
+        // Firebase mode
+        const result = await base44.auth.loginViaEmailPassword({
+          email: email.trim(),
+          password: password.trim(),
+        });
+        requestNotificationPermission();
+
+        // Fetch user profile to determine role
+        let roleKey = 'student';
+        try {
+          const uid = firebaseAuth.currentUser?.uid;
+          if (uid) {
+            const userDoc = await firestoreGetDoc(firestoreDoc(firebaseDb, 'users', uid));
+            if (userDoc.exists()) {
+              roleKey = userDoc.data().roleKey || 'student';
+            }
+          }
+        } catch {}
+
+        route = (returnTo && returnTo !== '/' && returnTo !== encodeURIComponent('/'))
+          ? returnTo
+          : await getPostLoginRoute(result.email, roleKey);
       }
+
+      // Store final route and navigate — RedirectIfAuthenticated will pick it up
+      sessionStorage.setItem('spark_post_auth_route', route);
+      navigate(route, { replace: true });
     } catch (err) {
-      setError(err.message);
+      sessionStorage.removeItem('spark_post_auth_route');
+      const msg = err.code === 'auth/invalid-credential' ? 'Invalid email or password'
+        : err.code === 'auth/user-not-found' ? 'No account found with this email'
+        : err.code === 'auth/wrong-password' ? 'Invalid email or password'
+        : err.code === 'auth/too-many-requests' ? 'Too many attempts. Please try again later.'
+        : err.message || 'Login failed';
+      setError(msg);
       setLoading(false);
     }
   };
 
   const handleRegister = async () => {
     if (!fullName.trim() || !email.trim() || !password.trim()) return;
-    if (password.trim().length < 4) {
-      setError('Password must be at least 4 characters');
+    if (password.trim().length < 6) {
+      setError('Password must be at least 6 characters');
       return;
     }
     setError('');
     setLoading(true);
+
+    // Determine route BEFORE auth fires — prevents RedirectIfAuthenticated race
+    const profileRoute = selectedRole === 'org' ? '/OrgRegistration' : '/ProfileBuilder';
+    sessionStorage.setItem('spark_post_auth_route', profileRoute);
+
     try {
-      await registerUser({
-        email: email.trim(),
-        password: password.trim(),
-        full_name: fullName.trim(),
-        roleKey: selectedRole,
-      });
-      // New users need to complete their profile first, but save returnTo for after
-      const profileRoute = selectedRole === 'org' ? '/OrgRegistration' : '/ProfileBuilder';
+      if (backendMode === 'mock') {
+        const { registerUser } = await import('@/api/mock/mockStore.js');
+        await registerUser({
+          email: email.trim(),
+          password: password.trim(),
+          full_name: fullName.trim(),
+          roleKey: selectedRole,
+        });
+      } else {
+        // Firebase: create account + store profile in Firestore
+        await base44.auth.register({
+          email: email.trim(),
+          password: password.trim(),
+          full_name: fullName.trim(),
+        });
+
+        // Fire-and-forget — writes to local cache instantly, syncs in background
+        const uid = firebaseAuth.currentUser?.uid;
+        if (uid) {
+          firestoreSetDoc(firestoreDoc(firebaseDb, 'users', uid), {
+            email: email.trim(),
+            full_name: fullName.trim(),
+            roleKey: selectedRole,
+            role: selectedRole === 'admin' ? 'admin' : 'user',
+            created_date: new Date().toISOString(),
+          }).catch(err => console.error('User profile write:', err));
+        }
+      }
+
       if (returnTo) {
-        // Store returnTo so user can be redirected after completing profile
         sessionStorage.setItem('spark_returnTo', returnTo);
       }
-      window.location.href = profileRoute;
+      navigate(profileRoute, { replace: true });
     } catch (err) {
-      setError(err.message);
+      sessionStorage.removeItem('spark_post_auth_route');
+      const msg = err.code === 'auth/email-already-in-use' ? 'Email already registered'
+        : err.code === 'auth/weak-password' ? 'Password must be at least 6 characters'
+        : err.code === 'auth/invalid-email' ? 'Please enter a valid email address'
+        : err.message || 'Registration failed';
+      setError(msg);
       setLoading(false);
     }
   };
@@ -134,7 +215,7 @@ export default function MockLoginScreen({ initialView }) {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input type="password" placeholder="Min 4 characters" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => handleKeyDown(e, handleRegister)} className="pl-10" />
+                  <Input type="password" placeholder="Min 6 characters" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => handleKeyDown(e, handleRegister)} className="pl-10" />
                 </div>
               </div>
 

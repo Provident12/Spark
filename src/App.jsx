@@ -37,10 +37,7 @@ const ProtectedRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) {
-    if (import.meta.env.VITE_MOCK_MODE === 'true') {
-      return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} replace />;
-    }
-    return <Navigate to="/login" replace />;
+    return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   }
 
   return children;
@@ -59,6 +56,20 @@ const RedirectIfAuthenticated = ({ children }) => {
   }
 
   if (isAuthenticated) {
+    // Check for post-auth route (set by registration/login before Firebase auth fires)
+    const postAuthRoute = sessionStorage.getItem('spark_post_auth_route');
+    if (postAuthRoute === '__pending__') {
+      // Login handler is still computing the route — wait
+      return (
+        <div className="fixed inset-0 flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+        </div>
+      );
+    }
+    if (postAuthRoute) {
+      sessionStorage.removeItem('spark_post_auth_route');
+      return <Navigate to={postAuthRoute} replace />;
+    }
     const params = new URLSearchParams(location.search);
     const returnTo = params.get('returnTo');
     return <Navigate to={returnTo || "/"} replace />;

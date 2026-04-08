@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -7,19 +7,17 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Building2, FileText, Clock, CheckCircle2, ChevronRight, Mail, Phone, Globe, Flag, ShieldAlert } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      setUser(u);
-      if (u?.role !== 'admin') {
-        navigate(createPageUrl('Landing'));
-      }
-    });
-  }, []);
+    if (user && user.role !== 'admin') {
+      navigate(createPageUrl('Landing'));
+    }
+  }, [user]);
 
   const { data: organizations = [] } = useQuery({
     queryKey: ['organizations'],

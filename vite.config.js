@@ -5,8 +5,17 @@ import fs from 'fs'
 import path from 'path'
 import dotenv from 'dotenv'
 
-// Load .env.development so server-side vars (RESEND_API_KEY, etc.) are available
-dotenv.config({ path: '.env.development' })
+// Load server-side vars (RESEND_API_KEY, etc.) from .env.development
+// These are NOT exposed to the browser — only used by Vite middleware (email plugin)
+// VITE_* vars are stripped so Vite's own mode-based loading (.env.production) takes priority
+const devEnv = dotenv.config({ path: '.env.development' })
+if (devEnv.parsed) {
+  for (const [key, val] of Object.entries(devEnv.parsed)) {
+    if (key.startsWith('VITE_')) {
+      delete process.env[key]
+    }
+  }
+}
 
 // Shared mock data server — stores entity data in a JSON file so all browsers share the same data
 function mockDataServerPlugin() {
@@ -132,6 +141,9 @@ function resendEmailPlugin() {
 // https://vite.dev/config/
 export default defineConfig({
   logLevel: 'error', // Suppress warnings, only show errors
+  build: {
+    target: 'esnext', // Support top-level await for conditional Firebase imports
+  },
   server: {
     host: true, // Expose on local network for phone testing
   },

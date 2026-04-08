@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/lib/AuthContext';
 import { createPageUrl } from '../utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -43,7 +44,7 @@ export default function OpportunityDetail() {
   const [searchParams] = useSearchParams();
   const oppId = searchParams.get('id');
 
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [opportunity, setOpportunity] = useState(null);
   const [organization, setOrganization] = useState(null);
   const [hasApplied, setHasApplied] = useState(false);
@@ -59,34 +60,36 @@ export default function OpportunityDetail() {
   const shouldAutoApply = searchParams.get('apply') === 'true';
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      setUser(u);
-      if (u && oppId) {
-        base44.entities.Application.filter({ student_id: u.email, opportunity_id: oppId }).then(apps => {
-          const alreadyApplied = apps.length > 0;
-          setHasApplied(alreadyApplied);
-          if (shouldAutoApply && !alreadyApplied) {
-            setShowApplicationModal(true);
-          }
-        });
-        base44.entities.SavedOpportunity.filter({ student_id: u.email, opportunity_id: oppId }).then(saved => {
-          setIsSaved(saved.length > 0);
-        });
-        base44.entities.StudentProfile.filter({ created_by: u.email }).then(profiles => {
-          if (profiles.length > 0) {
-            setStudentProfile(profiles[0]);
-          }
-        });
-      }
-    }).catch(() => setUser(null));
+    if (user && oppId) {
+      base44.entities.Application.filter({ student_id: user.email, opportunity_id: oppId }).then(apps => {
+        const alreadyApplied = apps.length > 0;
+        setHasApplied(alreadyApplied);
+        if (shouldAutoApply && !alreadyApplied) {
+          setShowApplicationModal(true);
+        }
+      });
+      base44.entities.SavedOpportunity.filter({ student_id: user.email, opportunity_id: oppId }).then(saved => {
+        setIsSaved(saved.length > 0);
+      });
+      base44.entities.StudentProfile.filter({ created_by: user.email }).then(profiles => {
+        if (profiles.length > 0) {
+          setStudentProfile(profiles[0]);
+        }
+      });
+    }
+  }, [user, oppId]);
 
+  useEffect(() => {
     if (oppId) {
       base44.entities.Opportunity.filter({ id: oppId }).then(opps => {
         if (opps.length > 0) {
           setOpportunity(opps[0]);
-          base44.entities.Organization.filter({ id: opps[0].organization_id }).then(orgs => {
-            if (orgs.length > 0) setOrganization(orgs[0]);
-          });
+          // Fetch org in parallel — don't wait for opportunity render to finish
+          if (opps[0].organization_id) {
+            base44.entities.Organization.filter({ id: opps[0].organization_id }).then(orgs => {
+              if (orgs.length > 0) setOrganization(orgs[0]);
+            });
+          }
         }
       });
     }

@@ -1,0 +1,47 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "StudentProfile",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "created_by", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "Organization",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "created_by", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "Application",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "created_by", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "Opportunity",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "SavedOpportunity",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "created_by", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "Notification",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "created_by", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
